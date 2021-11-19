@@ -1,11 +1,13 @@
 package com.exco.eidas;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Map;
 
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -15,6 +17,8 @@ import com.apigee.flow.execution.ExecutionContext;
 import com.apigee.flow.execution.ExecutionResult;
 import com.apigee.flow.execution.spi.Execution;
 import com.apigee.flow.message.MessageContext;
+
+import static java.util.Base64.*;
 
 public class EiDASCertificateParserCallout implements Execution {
 
@@ -36,7 +40,7 @@ public class EiDASCertificateParserCallout implements Execution {
 		EiDASCertificate eidascert = new EiDASCertificate();
 
 		try {
-			 operation = ((String)this.properties.get("operation") );
+			 operation = this.properties.get("operation");
 			 if( operation == null ) {
 				 throw new RuntimeException( "EIDAS: operation is not set. Supported operations: sign|show");
 			 }
@@ -64,11 +68,16 @@ public class EiDASCertificateParserCallout implements Execution {
 			 }else if( operation.equals("show") ){
 				
 				X509Certificate cert = null;
+
+				boolean encoded = messageContext.getVariable( this.properties.get("encoded") );
 				
+				pemCertificate = encoded
+								? new String(getDecoder()
+									.decode((String)messageContext.getVariable( this.properties.get("certificate-pem") )), StandardCharsets.UTF_8)
+									.replace("\\\\n", "\n")
+								: ((String)messageContext.getVariable( this.properties.get("certificate-pem") )).replace("\\\\n", "\n");
 				
-				pemCertificate = ((String)messageContext.getVariable( this.properties.get("certificate-pem") )).replaceAll("\\\\n", "\n");
-				
-				if (!(pemCertificate == null) && pemCertificate.contains("BEGIN CERTIFICATE")) {
+				if (pemCertificate.contains("BEGIN CERTIFICATE")) {
 					cert = eidascert.getCertificate( pemCertificate );
 				}
 				
